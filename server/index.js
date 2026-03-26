@@ -43,5 +43,9 @@ app.post('/posts/:id/comments', (req, res) => {
 } )
 
 app.listen(5000, () => {
-    console.log('Server is running on http://localhost:5000')
+    console.log('Posts service is running on http://localhost:5000')
 } )
+
+app.listen(5001, () => {
+    console.log('Comments service running on http://localhost:5001')
+})
