@@ -11,7 +11,7 @@ const onChange = (event) => {
 
 const onSubmit = async (event) => {
     event.preventDefault()
-    await axios.post('http://localhost:5000/posts/${postid}/comments', {content})
+    await axios.post(`http://localhost:5001/posts/${postid}/comments`, {content})
     setContent('')
 } 
 

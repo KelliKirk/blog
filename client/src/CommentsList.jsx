@@ -8,7 +8,7 @@ const CommentsList = ({postid}) => {
    useEffect(() => {
     const fetchComments = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/posts/${postid}/comments')
+            const res = await axios.get(`http://localhost:5001/posts/${postid}/comments`)
             const comments = res.data
             setComments(comments)
         } catch(err) {
