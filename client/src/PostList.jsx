@@ -22,12 +22,12 @@ useEffect(() => {
 
 console.log(posts)
 
-const postsForRender = posts.map(post => {
+const postsForRender = Object.values(posts).map(post => {
     return (
         <div className="card" style={{width: '30%', marginBottom: '20px'}} key={post.id}>
             <div className="card-body">
                 <h3>{post.title}</h3>
-                <CommentsList postid={post.id} />
+                <CommentsList comments={post.comments}  />
                 <CommentCreate postid={post.id} /> 
             </div>
         </div>
