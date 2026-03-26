@@ -10,7 +10,7 @@ const PostList = () => {
 useEffect(() => {
     const fetchPosts = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/posts')
+            const res = await axios.get('http://localhost:5002/posts')
             const posts = res.data
             setPosts(posts)
         } catch (err) {
