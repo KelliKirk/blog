@@ -2,18 +2,56 @@ const express = require('express')
 const { randomBytes } = require('node:crypto') 
 const axios = require ('axios')
 const cors = require('cors')
+const jwt = require('jsonwebtoken')
 
 const app = express()
 app.use(express.json())
-app.use(cors({origin:'http://localhost:3000'}))
+
+const allowedOrigins = [
+  "https://blog.local",
+  "http://blog.local",
+  "http://localhost:3000",
+];
+
+const corsOptions = {
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error("CORS blocked: " + origin));
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: false,
+};
+
+app.use(cors(corsOptions))
+
+const JWT_SECRET = 'your-secret-key'
+
+// Verify token middleware
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1]
+
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' })
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET)
+    req.user = decoded
+    next()
+  } catch (error) {
+    res.status(401).json({ error: 'Unauthorized: Invalid token' })
+  }
+}
 
 const postComments = []
 
-app.get('/posts/:id/comments', (req, res) => {
+app.get('/posts/:id/comments', verifyToken, (req, res) => {
     res.json(postComments.filter(comment => comment.postId === req.params.id))
 } )
 
-app.post('/posts/:id/comments', (req, res) => {
+app.post('/posts/:id/comments', verifyToken, (req, res) => {
     const postId = req.params.id
     const content = req.body.content
     const comment = {
@@ -24,7 +62,7 @@ app.post('/posts/:id/comments', (req, res) => {
     } 
     postComments.push(comment)
 
-    axios.post('http://localhost:5005/events', {
+    axios.post('http://event-bus-srv:5005/events', {
        type: 'CommentCreated',
        data: comment
     }).catch(err => {
@@ -42,7 +80,7 @@ app.post('/events', async (req, res) => {
         const comment = postComments.find(c => c.id === data.id)
         if (comment) {
             comment.status = data.status
-            await axios.post('http://localhost:5005/events', {
+            await axios.post('http://event-bus-srv:5005/events', {
                 type: 'CommentStatusUpdated',
                 data: { ...comment }
             }).catch(err => console.log('Error:', err.message))

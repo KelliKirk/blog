@@ -11,7 +11,7 @@ const onChange = (event) => {
 
 const onSubmit = async (event) => {
     event.preventDefault()
-    await axios.post('http://localhost:5000/posts', {title})
+    await axios.post('https://blog.local/posts/create', {title})
     setTitle('')
 } 
 
