@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swagger-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: swagger-ui
+  template:
+    metadata:
+      labels:
+        app: swagger-ui
+    spec:
+      containers:
+        - name: swagger-ui
+          image: swaggerapi/swagger-ui:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SWAGGER_JSON
+              value: /docs/openapi.yaml
+          volumeMounts:
+            - name: api-spec
+              mountPath: /usr/share/nginx/html/openapi.yaml
+              subPath: openapi.yaml
+              readOnly: true
+            - name: swagger-ui-config
+              mountPath: /usr/share/nginx/html/swagger-initializer.js
+              subPath: swagger-initializer.js
+              readOnly: true
+      volumes:
+        - name: api-spec
+          configMap:
+            name: api-docs
+        - name: swagger-ui-config
+          configMap:
+            name: swagger-ui-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: swagger-ui
+spec:
+  selector:
+    app: swagger-ui
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

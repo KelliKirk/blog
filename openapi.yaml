@@ -1,0 +1,410 @@
+openapi: 3.0.3
+info:
+  title: Blog Microservices API
+  version: 1.0.0
+  description: |
+    This API provides a microservices-based blogging platform where users can create posts, add comments, and manage authentication. It's designed for developers building content management systems or social platforms. The API supports user authentication via JWT tokens, post creation, and commenting functionality across distributed services.
+  contact:
+    name: Blog API Team
+    email: api@blogteam.com
+    url: https://blog.local/contact
+tags:
+  - name: Posts
+    description: Operations related to blog posts
+  - name: Comments
+    description: Operations related to comments on posts
+  - name: Auth
+    description: Authentication and authorization operations
+servers:
+  - url: https://blog.local
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+      required:
+        - message
+
+paths:
+  /posts:
+    get:
+      summary: Retrieve all posts with their comments
+      description: |
+        Fetches a list of all blog posts along with their associated comments. This endpoint aggregates data from the query service, which combines posts and comments from separate microservices. Requires authentication to access user-generated content. May return an empty list if no posts exist. Exceptions include service unavailability if the query service is down.
+      tags:
+        - Posts
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Successful retrieval of posts and comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Unique identifier of the post
+                    title:
+                      type: string
+                      description: Title of the post
+                    comments:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            description: Unique identifier of the comment
+                          content:
+                            type: string
+                            description: Text content of the comment
+                        required:
+                          - id
+                          - content
+                  required:
+                    - id
+                    - title
+                    - comments
+              example:
+                - id: "post123"
+                  title: "My First Blog Post"
+                  comments:
+                    - id: "comment456"
+                      content: "Great post!"
+        "401":
+          description: Authentication required or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Missing or invalid token"
+                code: "UNAUTHORIZED"
+        "503":
+          description: Service unavailable, typically due to query service downtime
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Query service unreachable"
+                code: "SERVICE_UNAVAILABLE"
+
+  /posts/create:
+    post:
+      summary: Create a new blog post
+      description: |
+        Allows authenticated users to create a new blog post. The post requires a title and is stored in the posts microservice. Upon successful creation, the post becomes available for commenting. Requires a valid JWT token obtained from login. Exceptions include validation errors if required fields are missing or if the posts service is unavailable.
+      tags:
+        - Posts
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  description: The title of the blog post, must be non-empty
+            example:
+              title: "Introduction to Microservices"
+      responses:
+        "201":
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Unique identifier of the newly created post
+                  title:
+                    type: string
+                    description: Title of the created post
+                required:
+                  - id
+                  - title
+              example:
+                id: "post789"
+                title: "Introduction to Microservices"
+        "400":
+          description: Bad request, e.g., missing or invalid title
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Title is required"
+                code: "VALIDATION_ERROR"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Unauthorized"
+                code: "UNAUTHORIZED"
+
+  /posts/{id}/comments:
+    get:
+      summary: Retrieve comments for a specific post
+      description: |
+        Fetches all comments associated with a given post ID. This endpoint queries the comments microservice directly. No authentication is required for reading comments. Returns an empty array if no comments exist. Exceptions occur if the post ID is invalid or the comments service is down.
+      tags:
+        - Comments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the post
+      responses:
+        "200":
+          description: Successful retrieval of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Unique identifier of the comment
+                    content:
+                      type: string
+                      description: Text content of the comment
+                  required:
+                    - id
+                    - content
+              example:
+                - id: "comment123"
+                  content: "This is a great post!"
+                - id: "comment124"
+                  content: "I agree, very informative."
+        "404":
+          description: Post not found or invalid post ID
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Post not found"
+                code: "NOT_FOUND"
+    post:
+      summary: Add a comment to a specific post
+      description: |
+        Allows users to add a new comment to an existing post. The comment is stored in the comments microservice and associated with the provided post ID. No authentication is required for commenting. Requires a valid post ID and non-empty content. Exceptions include invalid post ID or service unavailability.
+      tags:
+        - Comments
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Unique identifier of the post to comment on
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                  description: The text content of the comment, must be non-empty
+            example:
+              content: "This post really helped me understand microservices!"
+      responses:
+        "201":
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    description: Unique identifier of the newly created comment
+                  content:
+                    type: string
+                    description: Content of the created comment
+                required:
+                  - id
+                  - content
+              example:
+                id: "comment999"
+                content: "This post really helped me understand microservices!"
+        "400":
+          description: Bad request, e.g., missing or empty content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Content is required"
+                code: "VALIDATION_ERROR"
+        "404":
+          description: Post not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Post not found"
+                code: "NOT_FOUND"
+
+  /auth/login:
+    post:
+      summary: User login to obtain access token
+      description: |
+        Authenticates a user with email and password, returning an access token and setting a refresh token cookie. The access token is used for subsequent API calls requiring authentication. Tokens are JWT-based and expire after a short period. Exceptions include invalid credentials or service unavailability.
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User's email address
+                password:
+                  type: string
+                  description: User's password
+            example:
+              email: "user@example.com"
+              password: "securepassword123"
+      responses:
+        "200":
+          description: Login successful, returns access token and sets refresh cookie
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: JWT access token for API authentication
+                required:
+                  - accessToken
+              example:
+                accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Invalid email or password"
+                code: "INVALID_CREDENTIALS"
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token using refresh cookie
+      description: |
+        Generates a new access token using the refresh token stored in cookies. This endpoint is used to maintain user sessions without re-login. The refresh token is set during login and is long-lived. Exceptions include missing or invalid refresh cookie.
+      tags:
+        - Auth
+      responses:
+        "200":
+          description: New access token generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: New JWT access token
+                required:
+                  - accessToken
+              example:
+                accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        "401":
+          description: Missing or invalid refresh cookie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Invalid or missing refresh token"
+                code: "INVALID_REFRESH_TOKEN"
+
+  /auth/logout:
+    post:
+      summary: Logout and clear refresh cookie
+      description: |
+        Logs out the user by clearing the refresh token cookie. This invalidates the user's session. No request body is required. After logout, the user must re-login to obtain new tokens. This endpoint does not require authentication.
+      tags:
+        - Auth
+      responses:
+        "204":
+          description: Logout successful, no content returned
+
+  /auth/verify:
+    post:
+      summary: Verify access token validity
+      description: |
+        Checks if the provided access token is valid and not expired. This endpoint requires a Bearer token in the Authorization header. To obtain a token, use the /auth/login endpoint with valid credentials. In Swagger UI, click 'Authorize' and enter 'Bearer <your_token>' (without quotes) in the value field. Exceptions include invalid or expired tokens.
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    description: Indicates if the token is valid
+                required:
+                  - valid
+              example:
+                valid: true
+        "401":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                message: "Invalid token"
+                code: "INVALID_TOKEN"
